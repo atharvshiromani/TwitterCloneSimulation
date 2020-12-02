@@ -36,5 +36,5 @@ let echoServer =
                    
                 | _ ->  failwith "Unknown message"
             }
-        loop()
+        loop() 
 Console.ReadLine() |> ignore
