@@ -36,10 +36,16 @@ let topology (mailbox: Actor<_>) =
 let system = ActorSystem.Create("RemoteFSharp", configuration)
 
 let numberofusers = 100
-
+let echoClient = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server")
 for i in 1..numberofusers do
 
-    let echoClient = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server")
+    
     let task:Async<obj> = echoClient <? (spawn system (string i) topology)
     let response = Async.RunSynchronously (task,1000)
-    printfn "Reply from remote %s" (string(response))
+    printfn "Reply from Server %s" (string(response))
+
+
+let echoClient1 = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server1")
+let task1:Async<obj> = echoClient1 <? "startsim"
+let response = Async.RunSynchronously (task1,1000)
+printfn "Reply from Server %s" (string(response))
