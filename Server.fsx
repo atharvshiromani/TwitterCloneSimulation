@@ -12,9 +12,11 @@ let mutable client = new ResizeArray<IActorRef>()
 
 let objrandom = new System.Random()
 
-let mutable followerlist1 = new ResizeArray<IActorRef>()
+
 
 let mutable followerlist = new Dictionary<IActorRef, ResizeArray<IActorRef>>()
+
+let mutable hashtagtweets = new Dictionary<string, string>()
 
 let mutable tweets = new Dictionary<IActorRef, string>()
 
@@ -47,12 +49,14 @@ let followers (act: IActorRef) =
     for i in 1..followernum do
         let newfollower = client.[objrandom.Next(0,99)]
         follower.Add(newfollower)
-    followerlist1 <- follower
+    
 
     if followerlist.ContainsKey(act) then
         followerlist.Remove(act)
-        followerlist.Add(act, followerlist1)
-    followerlist1
+        followerlist.Add(act, follower)
+    else
+        followerlist.Add(act,follower)
+    follower
 
 let retweet (message: string, act: IActorRef) =
     //printfn "------yo%A" tweets
@@ -67,6 +71,8 @@ let sendTweet (act: IActorRef, follower: ResizeArray<_>) =
     follower |> Seq.iteri (fun index item -> printfn "%i: %A" index follower.[index])
     let tweet = "i love india #india" 
     tweets.Add(act, tweet)
+    hashtagtweets.Add("#india",tweet)
+
     for i in follower do
         i <! tweet
         printfn "%A tweeted %s to follower %A" act tweet i
@@ -83,7 +89,8 @@ let subscriberList (act : IActorRef) =
     //             subscribers.Add()
     
     for i in client do
-        let templist = followers (i)
+        let templist = followerlist.Item(i)
+        //printfn "%A" templist
         for j in templist do
             if act.Equals(j) then
                 subscribers.Add(i)
@@ -92,9 +99,21 @@ let subscriberList (act : IActorRef) =
     if following.ContainsKey(act) then
         following.Remove(act)
         following.Add(act, subscribers)
+    else
+        following.Add(act,subscribers)
     
     subscribers
    
+let queringfunction(query: string) =
+
+    
+    let temptweet = hashtagtweets.Item(query)
+    printfn "The tweet with %s are: %s" query temptweet
+
+    
+
+
+
 
 let register (act: IActorRef) =
     client.Add(act)
@@ -131,10 +150,12 @@ let echoServer1 =
                 match box message with
                 | :? string -> 
                     sender <! sprintf "Now Intiating Simulation Sequence"
-                    let node = client.[objrandom.Next(0,99)]
-                    followers(node)
+                    let node = client.[2]
+                    for i in client do
+                        followers(i)
                     sendTweet(node, followers (node))
                     subscriberList(node)
+                    queringfunction("#india")
                     return! loop()
             }
         loop()
