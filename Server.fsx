@@ -10,9 +10,7 @@ open System.IO
 
 let mutable client = new ResizeArray<IActorRef>()
 
-let objrandom = new System.Random()
-
-
+let objrandom = System.Random()
 
 let mutable followerlist = new Dictionary<IActorRef, ResizeArray<IActorRef>>()
 
@@ -25,21 +23,31 @@ let subscribers = new ResizeArray<_>()
 let mutable following = new Dictionary<IActorRef, ResizeArray<IActorRef>>()
 
 let config =
-    Configuration.parse
+    ConfigurationFactory.ParseString(
         @"akka {
             actor.provider = ""Akka.Remote.RemoteActorRefProvider, Akka.Remote""
             remote.helios.tcp {
                 hostname = localhost
                 port = 8090
             }
-        }"
+            
+            debug : {
+                    receive : on
+                    autoreceive : on
+                    lifecycle : on
+                    event-stream : on
+                    unhandled : on
+                    
+            }
+            log-dead-letters = 0
+            log-dead-letters-during-shutdown = off
+        }")
 
 
 let system = System.create "RemoteFSharp" config
 
 let followers (act: IActorRef) =
     
-    printfn "-----follower"
     let followernum = 5
 
     let mutable follower = new ResizeArray<IActorRef>()
@@ -52,7 +60,7 @@ let followers (act: IActorRef) =
     
 
     if followerlist.ContainsKey(act) then
-        followerlist.Remove(act)
+        followerlist.Remove(act) |> ignore
         followerlist.Add(act, follower)
     else
         followerlist.Add(act,follower)
@@ -66,16 +74,17 @@ let retweet (message: string, act: IActorRef) =
         printfn "%A retweeted %s to follower %A" act message i
 
 
-let sendTweet (act: IActorRef, follower: ResizeArray<_>) =
-    printfn "------"
-    follower |> Seq.iteri (fun index item -> printfn "%i: %A" index follower.[index])
+let sendTweet (act: IActorRef, followerlist: Dictionary<IActorRef,ResizeArray<_>>) =
+    //printfn "------"
+    //follower |> Seq.iteri (fun index item -> printfn "%i: %A" index follower.[index])
     let tweet = "i love india #india" 
+    let templist = followerlist.Item(act)
     tweets.Add(act, tweet)
     hashtagtweets.Add("#india",tweet)
 
-    for i in follower do
+    for i in templist do
         i <! tweet
-        printfn "%A tweeted %s to follower %A" act tweet i
+        //printfn "%A tweeted %s to follower %A" act tweet i
         retweet(tweet, i)
 
 let subscriberList (act : IActorRef) =
@@ -105,11 +114,10 @@ let subscriberList (act : IActorRef) =
     subscribers
    
 let queringfunction(query: string) =
-
-    
+ 
     let temptweet = hashtagtweets.Item(query)
-    printfn "The tweet with %s are: %s" query temptweet
-
+    //printfn "The tweet with %s are: %s" query temptweet
+    temptweet
     
 
 
@@ -117,7 +125,7 @@ let queringfunction(query: string) =
 
 let register (act: IActorRef) =
     client.Add(act)
-    printfn "Actor %A registered" act
+    
     
 
 let echoServer = 
@@ -128,38 +136,27 @@ let echoServer =
                 let! message = mailbox.Receive()
                 let sender = mailbox.Sender()
                 match box message with
-                | :? IActorRef -> 
-                    register(message)
+                | :? IActorRef as node-> 
+                    register(node)
                     
-                    sender <! sprintf "%A" message
-                    
-                    return! loop()
+                    sender <! sprintf "All of the clients are registered successfully" 
+                
+                | :? string as command ->
 
+                    sender <! sprintf "Intiating Simulation Sequence" 
+                    let node = client.[2]
+                    for i in client do
+                        followers(i) |> ignore
+                    sendTweet(node, followerlist)
+                    subscriberList(node)
+                    queringfunction("#india")
+                    //sender <! "Simulation Complete" 
+
+                return! loop()
+                
         
                
             }
         loop()
-
-let echoServer1 = 
-    spawn system "Server1"
-    <| fun mailbox ->
-        let rec loop() =
-            actor {
-                let! message = mailbox.Receive()
-                let sender = mailbox.Sender()
-                match box message with
-                | :? string -> 
-                    sender <! sprintf "Now Intiating Simulation Sequence"
-                    let node = client.[2]
-                    for i in client do
-                        followers(i)
-                    sendTweet(node, followers (node))
-                    subscriberList(node)
-                    queringfunction("#india")
-                    return! loop()
-            }
-        loop()
-
-
 
 Console.ReadLine() |> ignore
