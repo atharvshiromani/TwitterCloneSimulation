@@ -7,7 +7,10 @@ open System
 open Akka.Actor
 open Akka.Configuration
 open Akka.FSharp
+//open Message
 
+//type Message = Message of int * int
+              
 let configuration = 
     ConfigurationFactory.ParseString(
         @"akka {
@@ -46,13 +49,27 @@ let topology (mailbox: Actor<_>) =
 
     let rec loop() = actor {
         let! msg = mailbox.Receive()
-        printfn "%s" msg      
+        match msg with
+        | string -> printfn "%s" msg
+          
+            
+                    
+            
+            
     }
     loop()
 
+type integermessage = {numusers: int ; maxfollowers: int ;}
+
 let system = ActorSystem.Create("RemoteFSharp", configuration)
 
-let numberofusers = 100
+let numberofusers = fsi.CommandLineArgs.[1] |> int32
+let maximumfollowers = fsi.CommandLineArgs.[2] |> int32
+let userinput = new ResizeArray<int32>()
+
+userinput.Add(numberofusers)
+userinput.Add(maximumfollowers)
+
 timer.Start()
 for i in 1..numberofusers do
     let echoClient = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server")
@@ -62,8 +79,8 @@ for i in 1..numberofusers do
 
 
 let echoClient = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server")
-let task:Async<obj> = echoClient <? "startsim"
-let response = Async.RunSynchronously (task,1000)
+let task:Async<obj> = echoClient <? userinput
+let response = Async.RunSynchronously (task)
 printfn "Reply from Server %s" (string(response))
 
 timer.Stop()
