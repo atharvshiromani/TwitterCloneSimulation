@@ -8,6 +8,11 @@ open Akka.FSharp
 open System.Collections.Generic
 open System.IO
 
+let timer =
+    System.Diagnostics.Stopwatch()
+
+let mutable cot = 1
+
 let mutable client = new ResizeArray<IActorRef>()
 
 let objrandom = System.Random()
@@ -30,7 +35,8 @@ let config =
                 hostname = localhost
                 port = 8090
             }
-            
+            log-dead-letters = 0
+            log-dead-letters-during-shutdown = off
             debug : {
                     receive : on
                     autoreceive : on
@@ -39,8 +45,7 @@ let config =
                     unhandled : on
                     
             }
-            log-dead-letters = 0
-            log-dead-letters-during-shutdown = off
+            
         }")
 
 
@@ -68,7 +73,7 @@ let followers (act: IActorRef, numberofusers:int, maxfollower: int) =
         followerlist.Add(act,follower)
 
     follower
-
+    
 let retweet (message: string, act: IActorRef) =
     //printfn "------yo%A" tweets
     let followerlist2 = followerlist.Item(act)
@@ -86,11 +91,23 @@ let sendTweet (act: IActorRef, followerlist: Dictionary<IActorRef,ResizeArray<_>
     let templist2 = new ResizeArray<_>()
     templist2.Add(tweet)
     templist2.Add(usertweet)
-    tweets.Add(act, templist2)
-    
+    if tweets.ContainsKey(act) then
+        tweets.Remove(act)
+        tweets.Add(act, templist2)
+    else
+        tweets.Add(act, templist2)
 
-    hashtagtweets.Add("#AvengersEndGame",tweet)
-    hashtagtweets.Add("@ironman",usertweet)
+    if hashtagtweets.ContainsKey("#AvengersEndGame") then
+        hashtagtweets.Remove("#AvengersEndGame")
+        hashtagtweets.Add("#AvengersEndGame",tweet)
+    else
+        hashtagtweets.Add("#AvengersEndGame",tweet)
+
+    if hashtagtweets.ContainsKey("@ironman") then
+        hashtagtweets.Remove("@ironman")
+        hashtagtweets.Add("@ironman",tweet)
+    else
+        hashtagtweets.Add("@ironman",tweet)
 
     for i in templist do
         i <! sprintf "This is the original tweet: %s" tweet
@@ -150,23 +167,33 @@ let echoServer =
                 let sender = mailbox.Sender()
                 match box message with
                 | :? IActorRef as node-> 
-                    register(node)
                     
+                    register(node)
+                   
                     sender <! sprintf "%A registered succesfully" node 
                 
                 | :? ResizeArray<int32> as userinput ->
-
-                    sender <! sprintf "Intiating Simulation Sequence" 
+                    //timer.Start()
+                    //sender <! sprintf "Intiating Simulation Sequence" 
                     let numberofusers = userinput.[0]
                     let maxfollower = userinput.[1]
-                    let node = client.[2]
+                    
                     for i in client do
                         followers(i, numberofusers, maxfollower) |> ignore
-                    sendTweet(node, followerlist)
+                    
+                    let node = client.[objrandom.Next(0,99)]
+                    
+                    for i in 1..15 do
+                        let node1 = client.[i]
+                        sendTweet(node1, followerlist)
+                        printfn"---sending tweet %i times" i
                     //subscriberList(node) |>ignore
                     queringfunction("#AvengersEndGame",node)
                     queringfunction("@ironman",node)
-                    //sender <! "Simulation Complete" 
+                    //timer.Stop()
+                    //printfn "Tweeting and Retweeting %i time: %i" cot timer.ElapsedMilliseconds
+                    sender <! "Simulation Complete" 
+                   
 
                 return! loop()
                 

@@ -45,16 +45,15 @@ let configuration =
 let timer =
     System.Diagnostics.Stopwatch()
 
+let timer1 =
+    System.Diagnostics.Stopwatch()
+
 let topology (mailbox: Actor<_>) =
 
     let rec loop() = actor {
         let! msg = mailbox.Receive()
         match msg with
-        | string -> printfn "%s" msg
-          
-            
-                    
-            
+        | string -> printfn "%s" msg          
             
     }
     loop()
@@ -76,13 +75,16 @@ for i in 1..numberofusers do
     let task:Async<obj> = echoClient <? (spawn system (string i) topology )
     let response = Async.RunSynchronously (task)
     printfn "Reply from Server %s" (string(response))
+timer.Stop()
 
 
+timer1.Start()
 let echoClient = system.ActorSelection("akka.tcp://RemoteFSharp@localhost:8090/user/Server")
 let task:Async<obj> = echoClient <? userinput
 let response = Async.RunSynchronously (task)
 printfn "Reply from Server %s" (string(response))
+timer1.Stop()
 
-timer.Stop()
-printfn "Elapsed Milliseconds: %i" timer.ElapsedMilliseconds
+printfn "Tweeting and Retweeting time: %i" timer1.ElapsedMilliseconds
+printfn "Registration time: %i" timer.ElapsedMilliseconds
 system.Terminate()
